@@ -5,7 +5,7 @@ import cv2
 import pytesseract
 import matplotlib.pyplot as plt
 
-# TODO: Generally proceed line by line and save coordinates to draw black out boxes in the png (pdf backtrafo)
+# TODO: Save coordinates of each letter to draw black out boxes in the png when NER is done (pdf backtrafo)
 class PdfToText:
     """Saves the pdf as an image, searches for ROIs (text), crops it and returns text. The cropping is not mandatory"""
     def __init__(self):
@@ -56,18 +56,18 @@ class PdfToText:
     def find_ROI(self):
         thresh = self.image_editing()
         # Dilate to combine adjacent text contours (make lines thicker as opposed to erosion)
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10)) # adapt parameters if required
         dilate = cv2.dilate(thresh, kernel, iterations=5)
         # Find contours and assign text areas in a list. cv2.CHAIN_APPROX_SIMPLE stores only four points for each
         # rectangle
-        cont1 = cv2.findContours(dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cont = cont1[0] if len(cont1) == 2 else cont1[1]
+        cont = cv2.findContours(dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
+        # cont[1] is the hierarchy (relationship: i.e. parents, childs as outer and inner cont)
 
-        for c in cont:
-            area = cv2.contourArea(c)
-            x, y, w, h = cv2.boundingRect(c)
+        for x in cont:
+            area = cv2.contourArea(x)
+            x, y, w, h = cv2.boundingRect(x)
             # image is approx. 4100 x 2500 pixels (width x height)
-            if w >= 20 and h >= 50 and area > 200: # make sure that the rectangles are not too small
+            if w >= 20 and h >= 50 and area > 200: # make sure that the rectangles are not too small. Adapt if required
                 start_point = (x, y) # top left
                 end_point = (2700, y + h) # bottom right
                 self.rect = cv2.rectangle(self.im, start_point, end_point, color=(255, 0, 255), thickness=3)
