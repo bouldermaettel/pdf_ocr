@@ -5,7 +5,7 @@ import cv2
 import pytesseract
 import matplotlib.pyplot as plt
 
-# TODO: Generally proceed line by line and save coordinates.
+# TODO: Generally proceed line by line and save coordinates to draw black out boxes in the png (pdf backtrafo)
 class PdfToText:
     """Saves the pdf as an image, searches for ROIs (text), crops it and returns text. The cropping is not mandatory"""
     def __init__(self):
@@ -26,8 +26,8 @@ class PdfToText:
     def image_per_page(self) -> list:
         """Extracts each page of the pdf to an image"""
         self.pages = convert_from_path(self.pdf_path, 350, poppler_path=r'C:\Program Files\poppler-0.68.0\bin')
-        i = 1
 
+        i = 1
         for page in self.pages:
             image_name = "Page_" + str(i) + ".png"
             page.save(image_name, "PNG")
@@ -56,37 +56,55 @@ class PdfToText:
     def find_ROI(self):
         thresh = self.image_editing()
         # Dilate to combine adjacent text contours (make lines thicker as opposed to erosion)
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
-        dilate = cv2.dilate(thresh, kernel, iterations=4)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (10, 10))
+        dilate = cv2.dilate(thresh, kernel, iterations=5)
         # Find contours and assign text areas in a list. cv2.CHAIN_APPROX_SIMPLE stores only four points for each
         # rectangle
         cont1 = cv2.findContours(dilate, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        cont = cont1[0] if len(cont1) > 1 else cont1[1]
+        cont = cont1[0] if len(cont1) == 2 else cont1[1]
 
         for c in cont:
             area = cv2.contourArea(c)
             x, y, w, h = cv2.boundingRect(c)
+            # image is approx. 4100 x 2500 pixels (width x height)
+            if w >= 20 and h >= 50 and area > 200: # make sure that the rectangles are not too small
+                start_point = (x, y) # top left
+                end_point = (2700, y + h) # bottom right
+                self.rect = cv2.rectangle(self.im, start_point, end_point, color=(255, 0, 255), thickness=3)
+                self.coordinates.append([start_point, end_point])
 
-            if y >= 600 and x <= 1000 and area > 10000:
-                self.rect = cv2.rectangle(self.im, (x, y), (2200, y + h), color=(255, 0, 255), thickness=3)
-                self.coordinates.append([(x, y), (2200, y + h)])
+            # plt.figure(figsize=(10, 10))
+            # plt.imshow(self.rect)
+            # plt.show()
 
-            elif y >= 2400 and x <= 2000:
-                self.rect = cv2.rectangle(self.im, (x, y), (2200, y + h), color=(255, 0, 255), thickness=3)
-                self.coordinates.append([(x, y), (2200, y + h)])
-
-        return self.rect, self.coordinates
+        return self.coordinates
 
     def crop_images(self):
         """Crop image to ROI"""
         self.find_ROI() # should the coord being defined here
-        c = self.coordinates[1] # for cropping
-        self.cropped_images = self.im[c[0][1]:c[1][1], c[0][0]:c[1][0]]
 
-        # show the cropped image
-        plt.figure(figsize=(10,10))
-        plt.imshow(self.cropped_images)
-        plt.show()
+        xmin = []
+        xmax = []
+        ymin = []
+        ymax = []
+        for i in self.coordinates:
+            xleft = i[0][0]
+            xright = i[1][0]
+            xmin.append(xleft)
+            xmax.append(xright)
+
+            yupper= i[0][1]
+            ylower = i[1][1]
+            ymin.append(yupper)
+            ymax.append(ylower)
+
+        # self.cropped_images[y0:y1, x0:x1]
+        self.cropped_images = self.im[min(ymin):max(ymax), min(xmin):max(xmax)]
+
+        # # show the cropped image
+        # plt.figure(figsize=(10,10))
+        # plt.imshow(self.cropped_images)
+        # plt.show()
 
         return self.cropped_images
 
@@ -104,3 +122,4 @@ class PdfToText:
         # convert image to string
         text = str(pytesseract.image_to_string(thresh_new, config='--psm 6'))
         return text
+

@@ -11,8 +11,13 @@
 
 # imports
 from ocr_reading import PdfToText
+import matplotlib.pyplot as plt
 
 pdf_to_text = PdfToText()
-# pdf_to_text.cropping = True
+pdf_to_text.cropping = True
+a = pdf_to_text.crop_images()
+plt.figure(figsize=(10, 10))
+plt.imshow(a)
+plt.show()
 print(pdf_to_text.get_text())
 
