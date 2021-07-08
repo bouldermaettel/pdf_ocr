@@ -1,48 +1,52 @@
-# Matthias Mueller, 07.07.2021
-# matthias.mueller@swissmedic.ch
+"""This module is so fancy because it does ocr reading.
+
+Matthias Mueller, 07.07.2021
+matthias.mueller@swissmedic.ch
+"""
+from pathlib import Path
+
 from pdf2image import convert_from_path
 import cv2
 import pytesseract
 import matplotlib.pyplot as plt
 
+
 # TODO: Save coordinates of each letter to draw black out boxes in the png when NER is done (pdf backtrafo)
 class PdfToText:
     """Saves the pdf as an image, searches for ROIs (text), crops it and returns text. The cropping is not mandatory"""
-    def __init__(self):
-        self.original_images = []
+
+    def __init__(self, pdf_path: Path, cropping: bool = True, original_images: list = None):
         # TODO: to work only with one image for testing purposes
         self.im = None
         self.marked_images = []
         self.cropped_images = []
         self.rect = []
-        # define relative path of pdf and its name for testing purposes (will be used in a UI with a browsing function)
-        self.rel_path = r".\src\data"
-        self.pdf = r"\ScanTest.pdf"
-        self.pdf_path = self.rel_path + self.pdf
-        self.pages = 0
         self.coordinates = []
-        self.cropping = False
 
-    def image_per_page(self) -> list:
+        if original_images is None:
+            original_images = []
+        self._original_images = original_images
+        self._pdf_path = pdf_path
+        self._cropping = cropping
+
+    def image_per_page(self):
         """Extracts each page of the pdf to an image"""
-        self.pages = convert_from_path(self.pdf_path, 350, poppler_path=r'C:\Program Files\poppler-0.68.0\bin')
+        pages = convert_from_path(self._pdf_path, 350, poppler_path=Path('C:/Program Files/poppler-0.68.0/bin'))
 
-        i = 1
-        for page in self.pages:
+        for i, page in enumerate(pages):
             image_name = "Page_" + str(i) + ".png"
+            #TODO: directly convert to png for original_images
             page.save(image_name, "PNG")
-            self.original_images.append(cv2.imread(image_name))
-            i += 1
-        return self.original_images
+            self._original_images.append(cv2.imread(image_name))
 
     def image_editing(self):
         """Edit image to make the text extraction easier"""
         self.image_per_page() # could also assign variable self.im here...
         # TODO: loop over original images. Be aware, these are arrays (RGB channels) stored in a list
-        # if self.pages > 1:
+        # if pages > 1:
         #     im = self.original_images[0]
         # for testing purposes only use one image from the list (for more, make a for loop)
-        self.im = self.original_images[0]
+        self.im = self._original_images[0]
 
         # TODO: maybe RGB to grey instead of BGR (make greyscale picture when scanned in color)
         gray = cv2.cvtColor(self.im, cv2.COLOR_BGR2GRAY)
@@ -111,7 +115,7 @@ class PdfToText:
     def get_text(self) -> str:
         """Get text from image using OCR with pytesseract either with cropped images or with native ones"""
         pytesseract.pytesseract.tesseract_cmd = r'C:\Tesseract\tesseract.exe'
-        if self.cropping:
+        if self._cropping:
             self.crop_images()
             # B/W conversion for better contrast for OCR
             ret, thresh_new = cv2.threshold(self.cropped_images, 120, 255, cv2.THRESH_BINARY)
